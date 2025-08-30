@@ -1,27 +1,35 @@
+/**
+ * ZERA-X 2025 - Error Handler
+ * Author: SATHANIC (ZERA-X TEAM)
+ */
+
 const fs = require("fs");
 const path = require("path");
 
-const logFile = path.join(__dirname, "logs", "error.log");
+function logError(error, context = "General") {
+    const logDir = path.join(__dirname, "logs");
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
 
-// 🔹 Error log function
-function logError(error) {
+    const logFile = path.join(logDir, "errors.log");
     const timestamp = new Date().toISOString();
-    const message = `[${timestamp}] ${error.stack || error}\n`;
 
-    // Save to logs/error.log
-    fs.appendFileSync(logFile, message, "utf8");
-    console.error("❌ Error logged:", error.message || error);
+    const errorMsg = `[${timestamp}] [${context}] ${error?.stack || error}\n`;
+
+    fs.appendFileSync(logFile, errorMsg, "utf8");
+
+    console.error("❌ Error:", errorMsg);
 }
 
-// 🔹 Attach global error handlers
-function handleErrors() {
-    process.on("uncaughtException", (err) => {
-        logError(err);
+function errorHandler(sock) {
+    sock.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === "close") {
+            logError(lastDisconnect?.error, "Connection Closed");
+        }
     });
 
-    process.on("unhandledRejection", (reason, promise) => {
-        logError(reason);
-    });
+    process.on("uncaughtException", (err) => logError(err, "Uncaught Exception"));
+    process.on("unhandledRejection", (reason) => logError(reason, "Unhandled Rejection"));
 }
 
-module.exports = { handleErrors, logError };
+module.exports = { errorHandler, logError };
