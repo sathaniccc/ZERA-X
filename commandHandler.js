@@ -1,53 +1,86 @@
+/**
+ * ZERA-X 2025 - Command Handler
+ * Author: SATHANIC (ZERA-X TEAM)
+ */
+
 const fs = require("fs");
 const path = require("path");
-const config = require("./config");
+const prefix = "!"; // Default prefix (config.jsൽ നിന്നും കൂടി load ചെയ്യാം)
 
-let commands = new Map();
+async function commandHandler(sock, msg, config) {
+    try {
+        const m = msg.messages[0];
+        if (!m.message) return;
 
-// 🔹 Load all commands from zera_main/ & plugins/
-function loadCommands(sock) {
-    const mainDir = path.join(__dirname, "zera_main");
-    const pluginDir = path.join(__dirname, "plugins");
+        const from = m.key.remoteJid;
+        const isGroup = from.endsWith("@g.us");
+        const type = Object.keys(m.message)[0];
+        const body = 
+            (type === "conversation" && m.message.conversation) ||
+            (type === "extendedTextMessage" && m.message.extendedTextMessage.text) ||
+            (type === "imageMessage" && m.message.imageMessage.caption) ||
+            (type === "videoMessage" && m.message.videoMessage.caption) ||
+            "";
 
-    // Helper function
-    const loadFromDir = (dir) => {
-        if (!fs.existsSync(dir)) return;
-        fs.readdirSync(dir).forEach((file) => {
-            if (file.endsWith(".js")) {
-                const command = require(path.join(dir, file));
-                if (command.name && command.execute) {
-                    commands.set(command.name, command);
-                }
-            }
-        });
-    };
+        if (!body.startsWith(prefix)) return;
+        const args = body.slice(prefix.length).trim().split(/ +/);
+        const cmd = args.shift().toLowerCase();
 
-    loadFromDir(mainDir);
-    loadFromDir(pluginDir);
+        console.log(`⚡ Command Received: ${cmd} | From: ${from}`);
 
-    console.log(`✅ Loaded ${commands.size} commands`);
-    
-    // Listen for messages
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-        const m = messages[0];
-        if (!m.message || m.key.fromMe) return;
+        // --- Basic Commands ---
+        switch (cmd) {
+            case "alive":
+                await sock.sendMessage(from, { text: `✅ *ZERA-X 2025 is Alive!* ⚡\n\nPrefix: ${prefix}` }, { quoted: m });
+                break;
 
-        let sender = m.key.remoteJid;
-        let text = m.message.conversation || m.message.extendedTextMessage?.text;
-        if (!text) return;
+            case "ping":
+                const start = new Date().getTime();
+                await sock.sendMessage(from, { text: "🏓 Pong!" }, { quoted: m });
+                const end = new Date().getTime();
+                await sock.sendMessage(from, { text: `⚡ Response Time: *${end - start}ms*` });
+                break;
 
-        if (!text.startsWith(config.prefix)) return;
-        const args = text.slice(config.prefix.length).trim().split(/ +/);
-        const cmdName = args.shift().toLowerCase();
+            case "menu":
+                await sock.sendMessage(from, {
+                    text: `📖 *ZERA-X COMMANDS MENU*\n\n`
+                        + `> ⚡ alive\n`
+                        + `> ⚡ ping\n`
+                        + `> ⚡ help\n`
+                        + `> ⚡ about\n`
+                        + `> ⚡ tools (calculator, sticker, downloader...)\n\n`
+                        + `More plugins auto-loaded ✅`
+                }, { quoted: m });
+                break;
 
-        if (commands.has(cmdName)) {
-            try {
-                await commands.get(cmdName).execute(sock, m, args);
-            } catch (err) {
-                console.error("❌ Command Error:", err);
-            }
+            case "about":
+                await sock.sendMessage(from, { text: `🤖 *ZERA-X BOT 2025*\nCreated by: SATHANIC\nPowered with: Baileys 2025` }, { quoted: m });
+                break;
+
+            case "help":
+                await sock.sendMessage(from, { text: `ℹ️ Use ${prefix}menu to see all available commands.` }, { quoted: m });
+                break;
+
+            default:
+                // --- Plugin Loader (dynamic commands from /plugins) ---
+                const pluginsDir = path.join(__dirname, "plugins");
+                fs.readdirSync(pluginsDir).forEach((file) => {
+                    if (file.endsWith(".js")) {
+                        try {
+                            const plugin = require(path.join(pluginsDir, file));
+                            if (plugin && typeof plugin.run === "function" && plugin.cmd === cmd) {
+                                plugin.run(sock, m, args, config);
+                            }
+                        } catch (err) {
+                            console.error(`❌ Error in plugin ${file}:`, err);
+                        }
+                    }
+                });
+                break;
         }
-    });
+    } catch (err) {
+        console.error("❌ Command Handler Error:", err);
+    }
 }
 
-module.exports = { loadCommands };
+module.exports = { commandHandler };
