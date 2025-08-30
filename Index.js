@@ -1,53 +1,83 @@
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason
-} = require("@adiwajshing/baileys");
-const pino = require("pino");
-const fs = require("fs");
+/**
+ * ZERA-X 2025 - Main Bot File
+ * Author: SATHANIC (ZERA-X TEAM)
+ */
 
-const { loadCommands } = require("./commandHandler");
-const { loadEvents } = require("./eventHandler");
-const errorHandler = require("./errorHandler");
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
+const P = require("pino");
+const fs = require("fs");
+const path = require("path");
+
+// Handlers
+const { commandHandler } = require("./commandHandler");
+const { eventHandler } = require("./eventHandler");
+const { errorHandler } = require("./errorHandler");
 const config = require("./config");
 
-async function startZeraX() {
-    const { state, saveCreds } = await useMultiFileAuthState("./session");
+async function startBot() {
+    // ✅ Auth State (multi-file session)
+    const { state, saveCreds } = await useMultiFileAuthState("session");
 
+    // ✅ Get latest WhatsApp version
+    const { version } = await fetchLatestBaileysVersion();
+
+    // ✅ Create bot socket
     const sock = makeWASocket({
-        logger: pino({ level: "silent" }),
-        printQRInTerminal: true,
+        version,
         auth: state,
-        browser: ["ZERA X", "Chrome", "1.0.0"]
+        logger: P({ level: "silent" }),
+        printQRInTerminal: true,
+        browser: ["ZERA-X", "Chrome", "1.0.0"]
     });
 
-    // Handlers
-    loadCommands(sock);
-    loadEvents(sock);
-
+    // ✅ Session auto-save
     sock.ev.on("creds.update", saveCreds);
 
+    // ✅ Connection handling
     sock.ev.on("connection.update", (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === "close") {
-            if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-                console.log("⚠️ Connection closed, reconnecting...");
-                startZeraX();
+            const reason = new DisconnectReason(lastDisconnect?.error?.output?.statusCode);
+            console.log("❌ Disconnected:", reason);
+
+            if (reason !== DisconnectReason.loggedOut) {
+                console.log("♻️ Restarting bot...");
+                startBot(); // Auto restart
             } else {
-                console.log("❌ Logged out. Delete session and rescan QR.");
+                console.log("⚠️ Logged out. Delete session and re-scan QR.");
             }
         } else if (connection === "open") {
-            console.log("✅ ZERA X Connected Successfully!");
+            console.log("✅ ZERA-X Connected Successfully!");
         }
     });
 
-    sock.ev.on("messages.upsert", async (m) => {
+    // ✅ Message Handler
+    sock.ev.on("messages.upsert", async (msg) => {
         try {
-            // Command handler already manages this
+            await commandHandler(sock, msg, config);
         } catch (err) {
-            errorHandler(err, sock);
+            errorHandler(err, msg);
+        }
+    });
+
+    // ✅ Events (group updates, participants, etc.)
+    sock.ev.on("group-participants.update", async (event) => {
+        try {
+            await eventHandler(sock, event, config);
+        } catch (err) {
+            errorHandler(err, event);
+        }
+    });
+
+    // ✅ Auto Plugins Loader
+    const pluginsDir = path.join(__dirname, "plugins");
+    fs.readdirSync(pluginsDir).forEach((plugin) => {
+        if (plugin.endsWith(".js")) {
+            require(path.join(pluginsDir, plugin))(sock, config);
+            console.log(`📦 Plugin Loaded: ${plugin}`);
         }
     });
 }
 
-startZeraX();￼Enter
+// Start the bot
+startBot();
