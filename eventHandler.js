@@ -1,35 +1,48 @@
-const config = require("./config");
+/**
+ * ZERA-X 2025 - Event Handler
+ * Author: SATHANIC (ZERA-X TEAM)
+ */
 
-function eventHandler(sock) {
-    // 🔹 Connection update (QR / reconnect / close)
-    sock.ev.on("connection.update", (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        if (qr) {
-            console.log("📸 Scan this QR to connect your bot");
+async function eventHandler(sock, update, config) {
+    try {
+        if (update?.announce) {
+            console.log("📢 Group Announcement Changed:", update);
         }
-        if (connection === "close") {
-            console.log("❌ Connection closed, reconnecting...");
-            eventHandler(sock); // Auto reconnect
-        } else if (connection === "open") {
-            console.log(`✅ ${config.botName} connected successfully!`);
-        }
-    });
 
-    // 🔹 Group participant update (join / leave)
-    sock.ev.on("group-participants.update", async (update) => {
-        try {
-            const { id, participants, action } = update;
-            let participant = participants[0];
-
-            if (action === "add") {
-                await sock.sendMessage(id, { text: `👋 Welcome @${participant.split("@")[0]}!`, mentions: [participant] });
-            } else if (action === "remove") {
-                await sock.sendMessage(id, { text: `😢 Goodbye @${participant.split("@")[0]}`, mentions: [participant] });
+        if (update?.participants) {
+            for (let participant of update.participants) {
+                if (update.action === "add") {
+                    await sock.sendMessage(update.id, {
+                        text: `👋 Welcome @${participant.split("@")[0]} to *${update.subject || "this group"}*!`,
+                        mentions: [participant],
+                    });
+                } else if (update.action === "remove") {
+                    await sock.sendMessage(update.id, {
+                        text: `👋 Goodbye @${participant.split("@")[0]}!`,
+                        mentions: [participant],
+                    });
+                } else if (update.action === "promote") {
+                    await sock.sendMessage(update.id, {
+                        text: `🔰 @${participant.split("@")[0]} promoted as *Admin*!`,
+                        mentions: [participant],
+                    });
+                } else if (update.action === "demote") {
+                    await sock.sendMessage(update.id, {
+                        text: `⚡ @${participant.split("@")[0]} demoted from *Admin*!`,
+                        mentions: [participant],
+                    });
+                }
             }
-        } catch (err) {
-            console.error("❌ Event Error:", err);
         }
-    });
+
+        if (update?.subject) {
+            await sock.sendMessage(update.id, {
+                text: `📝 Group subject updated: *${update.subject}*`,
+            });
+        }
+    } catch (err) {
+        console.error("❌ Event Handler Error:", err);
+    }
 }
 
 module.exports = { eventHandler };
