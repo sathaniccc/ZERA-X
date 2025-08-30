@@ -1,57 +1,85 @@
-const sqlite3 = require("sqlite3").verbose();
-const path = require("path");
+/**
+ * ZERA-X 2025 - Database Handler
+ * Author: SATHANIC (ZERA-X TEAM)
+ */
+
 const fs = require("fs");
+const path = require("path");
 
-// 🔹 Database path
-const dbPath = path.join(__dirname, "database", "zeraX.db");
+const dbDir = path.join(__dirname, "database");
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir);
 
-// Ensure database folder exists
-if (!fs.existsSync(path.join(__dirname, "database"))) {
-    fs.mkdirSync(path.join(__dirname, "database"));
-}
+const dbFile = path.join(dbDir, "zera_db.json");
 
-// 🔹 Connect to DB
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error("❌ Database connection failed:", err.message);
-    } else {
-        console.log("✅ Connected to ZERA X database");
+// ✅ Initial DB
+let db = {
+    users: {},      // User data store
+    groups: {},     // Group-specific data
+    settings: {},   // Bot settings
+};
+
+// Load existing DB
+if (fs.existsSync(dbFile)) {
+    try {
+        db = JSON.parse(fs.readFileSync(dbFile, "utf8"));
+        console.log("📂 Database loaded successfully.");
+    } catch (e) {
+        console.error("❌ Error loading DB:", e);
     }
-});
-
-// 🔹 Create default tables
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        joined_at TEXT
-    )`);
-
-    db.run(`CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT
-    )`);
-});
-
-// 🔹 DB helper functions
-function addUser(id, name) {
-    db.run(`INSERT OR REPLACE INTO users (id, name, joined_at) VALUES (?, ?, datetime('now'))`, [id, name]);
 }
 
-function getUser(id, callback) {
-    db.get(`SELECT * FROM users WHERE id = ?`, [id], (err, row) => {
-        if (callback) callback(err, row);
-    });
+// Save DB
+function saveDB() {
+    fs.writeFileSync(dbFile, JSON.stringify(db, null, 2), "utf8");
 }
 
-function setSetting(key, value) {
-    db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`, [key, value]);
+// ✅ User functions
+function addUser(id) {
+    if (!db.users[id]) {
+        db.users[id] = { warns: 0, xp: 0, premium: false };
+        saveDB();
+    }
+    return db.users[id];
 }
 
-function getSetting(key, callback) {
-    db.get(`SELECT value FROM settings WHERE key = ?`, [key], (err, row) => {
-        if (callback) callback(err, row ? row.value : null);
-    });
+function updateUser(id, data) {
+    if (!db.users[id]) addUser(id);
+    db.users[id] = { ...db.users[id], ...data };
+    saveDB();
+    return db.users[id];
 }
 
-module.exports = { db, addUser, getUser, setSetting, getSetting };
+function getUser(id) {
+    return db.users[id] || addUser(id);
+}
+
+// ✅ Group functions
+function addGroup(id) {
+    if (!db.groups[id]) {
+        db.groups[id] = { welcome: true, antiLink: false, mute: false };
+        saveDB();
+    }
+    return db.groups[id];
+}
+
+function updateGroup(id, data) {
+    if (!db.groups[id]) addGroup(id);
+    db.groups[id] = { ...db.groups[id], ...data };
+    saveDB();
+    return db.groups[id];
+}
+
+function getGroup(id) {
+    return db.groups[id] || addGroup(id);
+}
+
+module.exports = {
+    db,
+    saveDB,
+    addUser,
+    updateUser,
+    getUser,
+    addGroup,
+    updateGroup,
+    getGroup,
+};
