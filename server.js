@@ -60,16 +60,27 @@ app.get("/", async (req, res) => {
         const qrImage = await qrcode.toDataURL(qrCodeData);
         res.send(`
             <html>
-            <head><title>ZERA-X QR</title></head>
-            <body style="text-align:center; font-family:sans-serif;">
+            <head>
+                <title>ZERA-X QR</title>
+                <meta http-equiv="refresh" content="15"> <!-- 🔄 Auto refresh every 15 sec -->
+                <style>
+                    body { text-align:center; font-family:sans-serif; background:#111; color:#fff; }
+                    img { margin-top:20px; border:5px solid #fff; border-radius:10px; }
+                    button { padding:10px 20px; font-size:16px; margin-top:20px; cursor:pointer; border:none; background:#0f0; border-radius:8px; }
+                </style>
+            </head>
+            <body>
                 <h2>📱 Scan This QR to Connect ZERA-X</h2>
                 <img src="${qrImage}" />
-                <p>Refresh page if expired</p>
+                <p>⚡ Refresh page if expired</p>
+                <form method="get" action="/">
+                    <button type="submit">🔄 Generate New QR</button>
+                </form>
             </body>
             </html>
         `);
     } else {
-        res.send("<h2>✅ ZERA-X Already Connected!</h2>");
+        res.send("<h2 style='text-align:center; font-family:sans-serif;'>✅ ZERA-X Already Connected!</h2>");
     }
 });
 
