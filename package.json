@@ -2,10 +2,11 @@
   "name": "zera-x",
   "version": "1.0.0",
   "description": "ZERA-X WhatsApp Bot (2025 Updated Version)",
-  "main": "index.js",
+  "main": "Index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node server.js",
+    "bot": "node Index.js",
+    "dev": "nodemon Index.js"
   },
   "keywords": [
     "WhatsApp",
@@ -19,11 +20,13 @@
     "@whiskeysockets/baileys": "^6.7.8",
     "pino": "^9.5.0",
     "qrcode-terminal": "^0.12.0",
+    "qrcode": "^1.5.3",
     "axios": "^1.7.5",
     "chalk": "^5.3.0",
     "node-cache": "^5.1.2",
     "sqlite3": "^5.1.7",
-    "mongoose": "^8.6.0"
+    "mongoose": "^8.6.0",
+    "express": "^4.19.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
