@@ -1,9 +1,17 @@
+/**
+ * ZERA-X 2025 - Server.js (QR Web Deployment)
+ * Author: SATHANIC TEAM
+ */
+
 const express = require("express");
 const qrcode = require("qrcode");
 const { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
+const P = require("pino");
 
 const app = express();
-let qrString = "";
+const PORT = process.env.PORT || 3000;
+
+let qrCodeData = ""; // Global QR holder
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState("session");
@@ -12,33 +20,53 @@ async function startBot() {
     const sock = makeWASocket({
         version,
         auth: state,
-        printQRInTerminal: false
+        logger: P({ level: "silent" }),
+        printQRInTerminal: false, // ❌ Don't print in terminal
+        browser: ["ZERA-X", "Chrome", "1.0.0"]
     });
 
+    // ✅ Save creds
     sock.ev.on("creds.update", saveCreds);
 
+    // ✅ QR Handler
     sock.ev.on("connection.update", (update) => {
         const { qr, connection } = update;
-
-        if (qr) qrString = qr;
-        if (connection === "open") {
-            console.log("✅ ZERA-X Connected to WhatsApp!");
+        if (qr) {
+            qrCodeData = qr;
+            console.log("📲 New QR generated, scan from web!");
         }
-        if (connection === "close") {
-            console.log("⚠️ Connection closed, restarting...");
-            startBot();
+        if (connection === "open") {
+            console.log("✅ ZERA-X Connected Successfully!");
+            qrCodeData = ""; // Clear QR after connection
         }
     });
+
+    return sock;
 }
 
-// QR page
+// Start bot
+startBot();
+
+// ✅ Web Route for QR
 app.get("/", async (req, res) => {
-    if (!qrString) return res.send("⏳ QR not generated yet, wait...");
-    const qrImg = await qrcode.toDataURL(qrString);
-    res.send(`<center><h2>📱 Scan this QR with WhatsApp to login ZERA-X</h2><br><img src="${qrImg}" /></center>`);
+    if (qrCodeData) {
+        const qrImage = await qrcode.toDataURL(qrCodeData);
+        res.send(`
+            <html>
+            <head><title>ZERA-X QR</title></head>
+            <body style="text-align:center; font-family:sans-serif;">
+                <h2>📱 Scan This QR to Connect ZERA-X</h2>
+                <img src="${qrImage}" />
+                <p>Refresh page if expired</p>
+            </body>
+            </html>
+        `);
+    } else {
+        res.send("<h2>✅ ZERA-X Already Connected!</h2>");
+    }
 });
 
-app.listen(process.env.PORT || 3000, () => {
-    console.log("🌐 QR Server running at http://localhost:3000");
-    startBot();
+// Start express server
+app.listen(PORT, () => {
+    console.log(`🌍 ZERA-X QR Server running on http://localhost:${PORT}`);
 });
