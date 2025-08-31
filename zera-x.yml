@@ -1,0 +1,14 @@
+name: ZERA-X
+
+services:
+  zera-x:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env:
+      SESSION_ID: ${SESSION_ID}
+      OWNER_NUMBER: "919778158839"
+      BOT_PREFIX: "."
+    ports:
+      - 3000:3000
+    start: "node ZERA-X.js"
