@@ -1,5 +1,5 @@
 /**
- * ZERA-X 2025 - Server.js (QR Web Deployment)
+ * ZERA-X 2025 - Server.js (QR Web Deployment + Direct Link)
  * Author: SATHANIC TEAM
  */
 
@@ -12,6 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 let qrCodeData = ""; // Global QR holder
+let qrImageBase64 = ""; // Store QR as PNG (Base64)
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState("session");
@@ -21,7 +22,7 @@ async function startBot() {
         version,
         auth: state,
         logger: P({ level: "silent" }),
-        printQRInTerminal: false, // ❌ Don't print in terminal
+        printQRInTerminal: false,
         browser: ["ZERA-X", "Chrome", "1.0.0"]
     });
 
@@ -29,15 +30,17 @@ async function startBot() {
     sock.ev.on("creds.update", saveCreds);
 
     // ✅ QR Handler
-    sock.ev.on("connection.update", (update) => {
+    sock.ev.on("connection.update", async (update) => {
         const { qr, connection } = update;
         if (qr) {
             qrCodeData = qr;
+            qrImageBase64 = await qrcode.toDataURL(qr); // Save QR as image
             console.log("📲 New QR generated, scan from web!");
         }
         if (connection === "open") {
             console.log("✅ ZERA-X Connected Successfully!");
-            qrCodeData = ""; // Clear QR after connection
+            qrCodeData = "";
+            qrImageBase64 = "";
         }
     });
 
@@ -47,22 +50,37 @@ async function startBot() {
 // Start bot
 startBot();
 
-// ✅ Web Route for QR
+// ✅ Web Route for QR (page view)
 app.get("/", async (req, res) => {
     if (qrCodeData) {
-        const qrImage = await qrcode.toDataURL(qrCodeData);
         res.send(`
             <html>
             <head><title>ZERA-X QR</title></head>
             <body style="text-align:center; font-family:sans-serif;">
                 <h2>📱 Scan This QR to Connect ZERA-X</h2>
-                <img src="${qrImage}" />
+                <img src="${qrImageBase64}" />
+                <p><a href="/qr">➡️ Direct QR Link</a></p>
                 <p>Refresh page if expired</p>
             </body>
             </html>
         `);
     } else {
         res.send("<h2>✅ ZERA-X Already Connected!</h2>");
+    }
+});
+
+// ✅ Direct QR PNG Route
+app.get("/qr", (req, res) => {
+    if (qrImageBase64) {
+        const base64Data = qrImageBase64.replace(/^data:image\/png;base64,/, "");
+        const img = Buffer.from(base64Data, "base64");
+        res.writeHead(200, {
+            "Content-Type": "image/png",
+            "Content-Length": img.length
+        });
+        res.end(img);
+    } else {
+        res.send("<h2>❌ No QR Available (Already Connected or Not Generated Yet)</h2>");
     }
 });
 
