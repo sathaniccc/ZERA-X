@@ -18,18 +18,27 @@ async function startBot() {
     sock.ev.on("creds.update", saveCreds);
 
     sock.ev.on("connection.update", (update) => {
-        const { qr } = update;
+        const { qr, connection } = update;
+
         if (qr) qrString = qr;
+        if (connection === "open") {
+            console.log("✅ ZERA-X Connected to WhatsApp!");
+        }
+        if (connection === "close") {
+            console.log("⚠️ Connection closed, restarting...");
+            startBot();
+        }
     });
 }
 
+// QR page
 app.get("/", async (req, res) => {
-    if (!qrString) return res.send("⏳ QR not generated yet...");
+    if (!qrString) return res.send("⏳ QR not generated yet, wait...");
     const qrImg = await qrcode.toDataURL(qrString);
-    res.send(`<h2>Scan this QR with WhatsApp</h2><img src="${qrImg}" />`);
+    res.send(`<center><h2>📱 Scan this QR with WhatsApp to login ZERA-X</h2><br><img src="${qrImg}" /></center>`);
 });
 
-app.listen(3000, () => {
-    console.log("🌐 QR Server running on http://localhost:3000");
+app.listen(process.env.PORT || 3000, () => {
+    console.log("🌐 QR Server running at http://localhost:3000");
     startBot();
 });
